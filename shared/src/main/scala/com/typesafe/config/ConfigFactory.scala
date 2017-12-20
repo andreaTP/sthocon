@@ -33,8 +33,6 @@ object MacroUtils {
 object Config {
   val configStrings = mutable.Map[Int, String]()
 
-  var confStr: String = _
-
   def getStringImpl(c: Context)(path: c.Expr[String]): c.Expr[String] = {
     import c.universe._
 
