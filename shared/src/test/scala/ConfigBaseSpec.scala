@@ -168,17 +168,80 @@ class ConfigBaseSpec {
     assertEquals(config.getBoolean("a.x6"), false)
   }
 
-  // @Test
-  // def reloadConfigWithFallback() = {
-  //   val config1 = ConfigFactory.parseString("""{ "a" : [] }""")
-  //   val config2 = ConfigFactory.parseString("""{ "b" : [] }""")
-  //
-  //   assert(config1 != null && config2 != null, "both config were null")
-  //
-  //   val config = config1.withFallback(config2).withFallback(config1)
-  //
-  //   assert(config.hasPath("a"), "config must have path a")
-  //   assert(config.hasPath("b"), "config must have path b")
-  //
-  // }
+  @Test
+  def reloadConfigWithFallback() = {
+    val config1 = ConfigFactory.parseString("""{ "a" : [] }""")
+    val config2 = ConfigFactory.parseString("""{ "b" : [] }""")
+
+    assert(config1 != null && config2 != null, "both config were null")
+
+    val config = config1.withFallback(config2).withFallback(config1)
+
+    assert(config.hasPath("a"), "config must have path a")
+    assert(config.hasPath("b"), "config must have path b")
+
+  }
+
+  @Test
+  def dottedConfigKey() = {
+    val configAkka =
+      ConfigFactory.parseString("akka.actor.messages = on")
+
+    assert(configAkka.hasPath("akka.actor.messages"),
+           "config must have path akka.actor.messages")
+
+  }
+
+  @Test
+  def dottedConfigKeyWithFallback() = {
+    val configAkka =
+      ConfigFactory.parseString("akka.actor.debug.event-stream = on").withFallback(
+        ConfigFactory.parseString("""
+          akka.actor.debug.event-stream = off
+          akka.actor.messages = on
+                                  """))
+
+    assert { configAkka.getBoolean("akka.actor.messages") }
+  }
+
+  @Test
+  def loadDefaultConfig() = {
+    val config = ConfigFactory.load()
+
+    assert { config != null }
+
+    assert { config.getString("loaded") == "DONE" }
+  }
+
+  @Test
+  def concatValues(): Unit = {
+    val x = ConfigFactory.parseString(
+      """x="foo"
+         y=   z "bar" """)
+    assertEquals("foo", x.getString("x"))
+    assertEquals("z bar", x.getString("y"))
+  }
+
+  @Test
+  def properlyFallback(): Unit = {
+    val conf1 = ConfigFactory.parseString("""x = "1"""")
+    val conf2 = ConfigFactory.parseString("""x = "2"""")
+
+    val conf = conf1.withFallback(conf2)
+    assertEquals("1", conf.getString("x"))
+  }
+
+  @Test
+  def parseComments(): Unit = {
+    val conf = ConfigFactory.parseString(
+      """
+      // ignored
+      x = "1"
+      # ignored
+      y = "foo"
+      """)
+    assertEquals("1", conf.getString("x"))
+    assertEquals("foo", conf.getString("y"))
+  }
+
 }

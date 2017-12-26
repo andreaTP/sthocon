@@ -154,19 +154,23 @@ object Config {
       }""")
   }
 
-  // def withFallbackImpl(c: Context)(config: c.Expr[Config]): c.Expr[Config] = {
-  //   import c.universe._
-  //
-  //   val configStr = Config.config.root.render ++ q"""$config.root.render"""
-  //
-  //   MacroUtils.i += 1
-  //
-  //   Config.configStrings.update(MacroUtils.i, configStr)
-  //
-  //   c.Expr[Config](q"""{
-  //       new com.typesafe.config.Config()
-  //     }""")
-  // }
+  def withFallbackImpl(c: Context)(config: c.Expr[Config]): c.Expr[Config] = {
+    import c.universe._
+
+    // this is a strong, and probably wrong assumption .... :-(
+    val configStr =
+      ct.config.ConfigFactory.parseString(configStrings(index - 1))
+        .withFallback(Config.config)
+        .root.render
+
+    MacroUtils.i += 1
+
+    Config.configStrings.update(MacroUtils.i, configStr)
+
+    c.Expr[Config](q"""{
+        new com.typesafe.config.Config()
+      }""")
+  }
 
 }
 
@@ -192,7 +196,7 @@ class Config() {
 
   def getConfig(path: String): Config = macro Config.getConfigImpl
 
-  // def withFallback(config: Config): Config = macro Config.withFallbackImpl
+  def withFallback(config: Config): Config = macro Config.withFallbackImpl
 }
 
 
@@ -207,8 +211,6 @@ object ConfigFactory {
 
     Config.configStrings.update(MacroUtils.i, configStr)
 
-    // println("configStr "+configStr)
-
     val res =
       c.Expr[com.typesafe.config.Config](q"""{
           new com.typesafe.config.Config()
@@ -218,5 +220,80 @@ object ConfigFactory {
   }
 
   def parseString(s: String): Config = macro parseStringImpl
+
+  def loadDefault(c: Context) = {
+    import c.universe._
+
+    MacroUtils.i += 1
+
+    try {
+      val res = new Object{}
+          .getClass
+          .getResource("/")
+          .toString + "application.conf"
+      System.setProperty("config.url", res)
+    } catch {
+      case err: Throwable =>
+        err.printStackTrace
+    }
+
+    ct.config.ConfigFactory.invalidateCaches()
+
+    val configStr = ct.config.ConfigFactory
+      .load()
+      .root.render
+
+    Config.configStrings.update(MacroUtils.i, configStr)
+
+    val res =
+      c.Expr[com.typesafe.config.Config](q"""{
+          new com.typesafe.config.Config()
+        }""")
+
+    res
+  }
+
+  def loadImpl(c: Context)() = loadDefault(c)
+
+  def load(): Config = macro loadImpl
+
+  def loadClImpl(c: Context)(cl: c.Expr[ClassLoader]) = loadDefault(c)
+
+  def load(cl: ClassLoader): Config = macro loadClImpl
+
+  def defaultReferenceImpl(c: Context)() = loadDefault(c)
+
+  def defaultReference(): Config = macro defaultReferenceImpl
+
+  def defaultReferenceClImpl(c: Context)(cl: c.Expr[ClassLoader]) = loadDefault(c)
+
+  def defaultReference(cl: ClassLoader): Config = macro defaultReferenceClImpl
+
+  def emptyImpl(c: Context)() = {
+    import c.universe._
+
+    MacroUtils.i += 1
+
+    val configStr =
+      ct.config.ConfigFactory
+        .parseString("{}")
+        .root.render
+
+    Config.configStrings.update(MacroUtils.i, configStr)
+
+    val res =
+      c.Expr[com.typesafe.config.Config](q"""{
+          new com.typesafe.config.Config()
+        }""")
+
+    res
+  }
+
+  def empty() = macro emptyImpl
+
+  // def parseMap(values: java.util.Map[String, Any]) =
+  //   parseString(values.asScala.map{ case (k, v) => s"$k=$v"}.mkString("\n"))
+
+  // def load(conf: Config): Config = conf
 
 }

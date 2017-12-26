@@ -1,11 +1,30 @@
 
+lazy val fixResources = taskKey[Unit](
+    "Fix application.conf presence on first clean build.")
+
 val commonSettings = Vector(
   name := "sthocon",
   organization := "org.akka-js",
   version := "0.0.1-SNAPSHOT",
   scalaVersion := "2.12.4",
   crossScalaVersions  :=
-    Vector("2.11.11", "2.12.4")
+  Vector("2.11.11", "2.12.4"),
+  fixResources := {
+    val compileConf = (resourceDirectory in Compile).value / "application.conf"
+    if (compileConf.exists)
+      IO.copyFile(
+        compileConf,
+        (classDirectory in Compile).value / "application.conf"
+      )
+    val testConf = (resourceDirectory in Test).value / "application.conf"
+    if (testConf.exists) {
+      IO.copyFile(
+        testConf,
+        (classDirectory in Test).value / "application.conf"
+      )
+    }
+  },
+  compile in Compile := (compile in Compile).dependsOn(fixResources).value
 )
 
 lazy val typesafeShadedConfig = project.in(file("tconfig"))
@@ -21,7 +40,10 @@ lazy val typesafeShadedConfig = project.in(file("tconfig"))
     assemblyShadeRules in assembly := Seq(
       ShadeRule.rename("com.typesafe.**" -> "ct.@1").inAll
     ),
-    assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)
+    assemblyOption in assembly :=
+      (assemblyOption in assembly)
+      .value
+      .copy(includeScala = false)
   )
 
 lazy val sthocon = crossProject.in(file(".")).
